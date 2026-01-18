@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: pw-ims-postgres
+    ports:
+      - "5440:5432"
+    environment:
+      POSTGRES_DB: ims_db
+      POSTGRES_USER: pw_user
+      POSTGRES_PASSWORD: pw_local_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
