@@ -11,5 +11,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  ims-service:
+    build: .
+    container_name: pw-ims-service
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://pw_user:pw_local_dev@postgres:5432/ims_db
+    depends_on:
+      - postgres
+
+
 volumes:
   postgres_data:
