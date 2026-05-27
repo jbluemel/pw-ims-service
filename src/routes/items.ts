@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db/connection';
+import { publishItemEvent } from '../nats/publisher';
 
 const router = Router();
 
@@ -9,6 +10,7 @@ router.get('/', async (_req, res) => {
     const result = await query('SELECT * FROM items ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (error) {
+    console.error('List items error:', error);
     res.status(500).json({ error: 'Failed to fetch items' });
   }
 });
@@ -22,6 +24,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Get item error:', error);
     res.status(500).json({ error: 'Failed to fetch item' });
   }
 });
@@ -32,24 +35,32 @@ router.post('/', async (req, res) => {
     const {
       year, make, model, vin, miles, location_address, seller_account_number,
       data_capture_status, title_received, seller_name_matches, lien_search,
-      clean_title_check, odometer_reading_check, review_status, published
+      clean_title_check, odometer_reading_check, review_status, published,
+      universal_id, origin_system, icn
     } = req.body;
 
     const result = await query(
       `INSERT INTO items (
         year, make, model, vin, miles, location_address, seller_account_number,
         data_capture_status, title_received, seller_name_matches, lien_search,
-        clean_title_check, odometer_reading_check, review_status, published
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        clean_title_check, odometer_reading_check, review_status, published,
+        universal_id, origin_system, icn
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *`,
       [
         year, make, model, vin, miles, location_address, seller_account_number,
         data_capture_status, title_received, seller_name_matches, lien_search,
-        clean_title_check, odometer_reading_check, review_status, published
+        clean_title_check, odometer_reading_check, review_status, published,
+        universal_id || null, origin_system || 'IMS', icn
       ]
     );
-    res.status(201).json(result.rows[0]);
+
+    const item = result.rows[0];
+    publishItemEvent('ITEM_CREATED', item);
+
+    res.status(201).json(item);
   } catch (error) {
+    console.error('Create item error:', error);
     res.status(500).json({ error: 'Failed to create item' });
   }
 });
@@ -83,8 +94,13 @@ router.put('/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    res.json(result.rows[0]);
+
+    const item = result.rows[0];
+    publishItemEvent('ITEM_UPDATED', item);
+
+    res.json(item);
   } catch (error) {
+    console.error('Update item error:', error);
     res.status(500).json({ error: 'Failed to update item' });
   }
 });
@@ -99,7 +115,7 @@ router.patch('/:id', async (req, res) => {
 
     const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
     const values = fields.map(field => req.body[field]);
-    
+
     const result = await query(
       `UPDATE items SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${fields.length + 1} RETURNING *`,
       [...values, req.params.id]
@@ -108,9 +124,28 @@ router.patch('/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    res.json(result.rows[0]);
+
+    const item = result.rows[0];
+    publishItemEvent('ITEM_UPDATED', item);
+
+    res.json(item);
   } catch (error) {
+    console.error('Patch item error:', error);
     res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// Delete item
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await query('DELETE FROM items WHERE id = $1 RETURNING *', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json({ message: 'Item deleted' });
+  } catch (error) {
+    console.error('Delete item error:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
   }
 });
 
@@ -124,8 +159,13 @@ router.post('/:id/publish', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    res.json(result.rows[0]);
+
+    const item = result.rows[0];
+    publishItemEvent('ITEM_PUBLISHED', item);
+
+    res.json(item);
   } catch (error) {
+    console.error('Publish item error:', error);
     res.status(500).json({ error: 'Failed to publish item' });
   }
 });
@@ -140,30 +180,15 @@ router.post('/:id/unpublish', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    res.json(result.rows[0]);
+
+    const item = result.rows[0];
+    publishItemEvent('ITEM_UNPUBLISHED', item);
+
+    res.json(item);
   } catch (error) {
+    console.error('Unpublish item error:', error);
     res.status(500).json({ error: 'Failed to unpublish item' });
   }
 });
-
-
-// Delete item
-router.delete('/:id', async (req, res) => {
-  try {
-    const result = await query('DELETE FROM items WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    res.json({ message: 'Item deleted' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete item' });
-  }
-});
-
-
-
-
-
-
 
 export default router;

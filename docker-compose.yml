@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: pw_local_dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pw-network
 
   ims-service:
     build: .
@@ -17,10 +19,16 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://pw_user:pw_local_dev@postgres:5432/ims_db
+      DATABASE_URL: postgresql://pw_user:pw_local_dev@pw-ims-postgres:5432/ims_db
+      NATS_URL: nats://pw-nats:4222
     depends_on:
       - postgres
-
+    networks:
+      - pw-network
 
 volumes:
   postgres_data:
+
+networks:
+  pw-network:
+    external: true
