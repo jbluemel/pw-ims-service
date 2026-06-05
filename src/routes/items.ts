@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db/connection';
+import { estimateValue } from '../services/estimator';
+import { insertEstimate, listEstimatesForItem, getLatestEstimate } from '../services/estimates';
 
 const router = Router();
 
@@ -26,7 +28,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create item
+// Create item (auto-estimates value on save)
 router.post('/', async (req, res) => {
   try {
     const {
@@ -48,7 +50,25 @@ router.post('/', async (req, res) => {
         clean_title_check, odometer_reading_check, review_status, published
       ]
     );
-    res.status(201).json(result.rows[0]);
+
+    const item = result.rows[0];
+
+    // Try to estimate value — best-effort, don't fail item creation if it errors
+    let estimate = null;
+    try {
+      const estimateResult = await estimateValue({
+        year: item.year,
+        make: item.make,
+        model: item.model,
+        mileage: item.miles,
+        location: item.location_address,
+      });
+      estimate = await insertEstimate(item.id, estimateResult);
+    } catch (estErr) {
+      console.error('Estimate failed for item', item.id, estErr);
+    }
+
+    res.status(201).json({ ...item, estimate });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create item' });
   }
@@ -161,7 +181,53 @@ router.delete('/:id', async (req, res) => {
 });
 
 
+// Manual re-estimate
+router.post('/:id/estimates', async (req, res) => {
+  try {
+    const itemResult = await query('SELECT * FROM items WHERE id = $1', [req.params.id]);
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    const item = itemResult.rows[0];
 
+    const estimateResult = await estimateValue({
+      year: item.year,
+      make: item.make,
+      model: item.model,
+      mileage: item.miles,
+      location: item.location_address,
+    });
+    const estimate = await insertEstimate(item.id, estimateResult);
+
+    res.status(201).json(estimate);
+  } catch (error) {
+    console.error('Re-estimate failed', error);
+    res.status(500).json({ error: 'Failed to create estimate' });
+  }
+});
+
+// List all estimates for an item (history)
+router.get('/:id/estimates', async (req, res) => {
+  try {
+    const estimates = await listEstimatesForItem(req.params.id);
+    res.json(estimates);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch estimates' });
+  }
+});
+
+// Get latest estimate for an item
+router.get('/:id/estimates/latest', async (req, res) => {
+  try {
+    const estimate = await getLatestEstimate(req.params.id);
+    if (!estimate) {
+      return res.status(404).json({ error: 'No estimate found' });
+    }
+    res.json(estimate);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch estimate' });
+  }
+});
 
 
 
