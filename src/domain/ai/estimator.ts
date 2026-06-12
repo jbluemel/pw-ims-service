@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
 });
 
 const MODEL = 'claude-sonnet-4-5';
-const PROMPT_VERSION = 'v1';
+const PROMPT_VERSION = 'v2';
 
 export interface EstimateResult {
   low_price: number;
@@ -20,10 +20,10 @@ export interface ItemForEstimate {
   make?: string | null;
   model?: string | null;
   description?: string | null;
-  condition?: string | null;
   location?: string | null;
   mileage?: number | null;
   hours?: number | null;
+  extra_attributes?: Record<string, unknown> | null;
 }
 
 export async function estimateValue(item: ItemForEstimate): Promise<EstimateResult> {
@@ -32,6 +32,7 @@ export async function estimateValue(item: ItemForEstimate): Promise<EstimateResu
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1024,
+    temperature: 0,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -55,14 +56,22 @@ function buildPrompt(item: ItemForEstimate): string {
   if (item.make) lines.push(`Make: ${item.make}`);
   if (item.model) lines.push(`Model: ${item.model}`);
   if (item.description) lines.push(`Description: ${item.description}`);
-  if (item.condition) lines.push(`Condition: ${item.condition}`);
   if (item.location) lines.push(`Location: ${item.location}`);
   if (item.mileage) lines.push(`Mileage: ${item.mileage}`);
   if (item.hours) lines.push(`Hours: ${item.hours}`);
 
+  if (item.extra_attributes && Object.keys(item.extra_attributes).length > 0) {
+    lines.push('');
+    lines.push('Additional details:');
+    for (const [key, value] of Object.entries(item.extra_attributes)) {
+      if (value === null || value === undefined) continue;
+      lines.push(`- ${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+    }
+  }
+
   return `You are an expert appraiser for heavy equipment, vehicles, and machinery sold at auction.
 
-Estimate the auction sale value range (low and high USD) for this item. Be realistic — auction prices are typically below retail.
+Estimate the auction sale value range (low and high USD) for this item. Be realistic — Purple Wave auction prices are typically 50-65% of retail value due to as-is, no-warranty sale terms and bidder competition dynamics. Be conservative.
 
 Item details:
 ${lines.join('\n')}
@@ -72,7 +81,6 @@ Respond ONLY with valid JSON in this exact format, no other text:
 }
 
 function parseResponse(text: string): { low_price: number; high_price: number; reasoning: string } {
-  // Strip any markdown code fences if present
   const cleaned = text.replace(/```json|```/g, '').trim();
   const parsed = JSON.parse(cleaned);
 

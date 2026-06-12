@@ -1,0 +1,16 @@
+# Non-secret, environment-specific config (12-factor).
+# Secrets (DB_PASSWORD, ANTHROPIC_API_KEY) live in the Secret, not here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pw-ims-service-config
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  LOG_LEVEL: "info"
+  SHUTDOWN_TIMEOUT_MS: "10000"
+  # DB connection parts — connection.ts assembles these when DATABASE_URL is unset.
+  DB_HOST: "pw-ims-db.example.us-east-2.rds.amazonaws.com"
+  DB_NAME: "ims_db"
+  DB_PORT: "5432"
+  DB_USER: "postgres"

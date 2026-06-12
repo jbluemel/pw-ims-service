@@ -1,10 +1,10 @@
-import { pool } from '../connection';
+import { pool } from '../../db/connection';
 
 export async function up() {
   await pool.query(`
     ALTER TABLE items
-    ADD COLUMN universal_id UUID DEFAULT gen_random_uuid(),
-    ADD COLUMN origin_system VARCHAR(50) DEFAULT 'IMS'
+    ADD COLUMN IF NOT EXISTS universal_id UUID DEFAULT gen_random_uuid(),
+    ADD COLUMN IF NOT EXISTS origin_system VARCHAR(50) DEFAULT 'IMS'
   `);
 }
 

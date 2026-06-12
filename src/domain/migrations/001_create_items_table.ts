@@ -1,8 +1,8 @@
-import { pool } from '../connection';
+import { pool } from '../../db/connection';
 
 export async function up() {
   await pool.query(`
-    CREATE TABLE items (
+    CREATE TABLE IF NOT EXISTS items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
       -- Core fields
