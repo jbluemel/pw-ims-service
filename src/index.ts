@@ -1,19 +1,27 @@
-import express from 'express';
-import cors from 'cors';
-import itemsRouter from './routes/items';
+import { createApp } from './http/app';
+import { config } from './config';
+import { pool } from './db/connection';
+import { logger } from './lib/logger';
 
-const app = express();
-const PORT = 3001;
+const app = createApp();
 
-app.use(cors());
-app.use(express.json());
-
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+const server = app.listen(config.port, () => {
+  logger.info({ port: config.port }, 'Server running');
 });
 
-app.use('/items', itemsRouter);
+// Graceful shutdown: stop accepting connections, drain the DB pool, then exit.
+// k8s sends SIGTERM on rolling deploys; we want in-flight requests to finish.
+async function shutdown(signal: string) {
+  logger.info({ signal }, 'Shutting down');
+  server.close(async () => {
+    await pool.end();
+    process.exit(0);
+  });
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, config.shutdownTimeoutMs).unref();
+}
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pw-ims-service
+  labels:
+    app: pw-ims-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pw-ims-service
+  template:
+    metadata:
+      labels:
+        app: pw-ims-service
+    spec:
+      # Give in-flight requests time to drain on rolling deploys.
+      # Should exceed SHUTDOWN_TIMEOUT_MS.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: pw-ims-service
+          # Replace with the ECR image ref; CI injects the tag.
+          image: <ECR_REGISTRY>/pw-ims-service:<TAG>
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: pw-ims-service-config
+            - secretRef:
+                name: pw-ims-service-secrets
+          # Liveness: restart the pod if the process is wedged.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Readiness: pull the pod from the Service if the DB is unreachable.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

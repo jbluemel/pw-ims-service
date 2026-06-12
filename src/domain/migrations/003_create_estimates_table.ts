@@ -1,8 +1,8 @@
-import { pool } from '../connection';
+import { pool } from '../../db/connection';
 
 export async function up() {
   await pool.query(`
-    CREATE TABLE estimates (
+    CREATE TABLE IF NOT EXISTS estimates (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
       low_price NUMERIC(12, 2) NOT NULL,
@@ -13,8 +13,8 @@ export async function up() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX idx_estimates_item_id ON estimates(item_id);
-    CREATE INDEX idx_estimates_created_at ON estimates(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_estimates_item_id ON estimates(item_id);
+    CREATE INDEX IF NOT EXISTS idx_estimates_created_at ON estimates(created_at DESC);
   `);
 }
 

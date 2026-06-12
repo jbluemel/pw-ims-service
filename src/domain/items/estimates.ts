@@ -1,5 +1,5 @@
-import { pool } from '../db/connection';
-import { EstimateResult } from './estimator';
+import { pool } from '../../db/connection';
+import { EstimateResult } from '../ai/estimator';
 
 export interface EstimateRow {
   id: string;
@@ -9,13 +9,18 @@ export interface EstimateRow {
   reasoning: string;
   model_used: string;
   prompt_version: string;
+  item_snapshot: any;
   created_at: Date;
 }
 
-export async function insertEstimate(itemId: string, estimate: EstimateResult): Promise<EstimateRow> {
+export async function insertEstimate(
+  itemId: string,
+  estimate: EstimateResult,
+  snapshot: any
+): Promise<EstimateRow> {
   const result = await pool.query(
-    `INSERT INTO estimates (item_id, low_price, high_price, reasoning, model_used, prompt_version)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO estimates (item_id, low_price, high_price, reasoning, model_used, prompt_version, item_snapshot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       itemId,
@@ -24,6 +29,7 @@ export async function insertEstimate(itemId: string, estimate: EstimateResult): 
       estimate.reasoning,
       estimate.model_used,
       estimate.prompt_version,
+      JSON.stringify(snapshot),
     ]
   );
   return result.rows[0];

@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { query } from '../db/connection';
-import { estimateValue } from '../services/estimator';
-import { insertEstimate, listEstimatesForItem, getLatestEstimate } from '../services/estimates';
+import { query } from '../../db/connection';
+import { estimateValue } from '../ai/estimator';
+import { insertEstimate, listEstimatesForItem, getLatestEstimate } from './estimates';
+import { extractFromText } from '../ai/extractor';
+import { logger } from '../../lib/logger';
 
 const router = Router();
 
@@ -63,9 +65,9 @@ router.post('/', async (req, res) => {
         mileage: item.miles,
         location: item.location_address,
       });
-      estimate = await insertEstimate(item.id, estimateResult);
+      estimate = await insertEstimate(item.id, estimateResult, item);
     } catch (estErr) {
-      console.error('Estimate failed for item', item.id, estErr);
+      logger.error({ err: estErr, itemId: item.id }, 'Estimate failed for item');
     }
 
     res.status(201).json({ ...item, estimate });
@@ -197,11 +199,11 @@ router.post('/:id/estimates', async (req, res) => {
       mileage: item.miles,
       location: item.location_address,
     });
-    const estimate = await insertEstimate(item.id, estimateResult);
+    const estimate = await insertEstimate(item.id, estimateResult, item);
 
     res.status(201).json(estimate);
   } catch (error) {
-    console.error('Re-estimate failed', error);
+    logger.error({ err: error }, 'Re-estimate failed');
     res.status(500).json({ error: 'Failed to create estimate' });
   }
 });
@@ -231,5 +233,123 @@ router.get('/:id/estimates/latest', async (req, res) => {
 
 
 
+
+
+// Create item from unstructured text — extract, save, estimate
+router.post('/from-text', async (req, res) => {
+  try {
+    const { raw_text } = req.body;
+
+    if (!raw_text || typeof raw_text !== 'string' || raw_text.trim().length === 0) {
+      return res.status(400).json({ error: 'raw_text is required' });
+    }
+
+    let extracted;
+    try {
+      extracted = await extractFromText(raw_text);
+    } catch (extractErr) {
+      logger.error({ err: extractErr }, 'Extraction failed');
+      return res.status(500).json({ error: 'Failed to extract data from text' });
+    }
+
+    const result = await query(
+      `INSERT INTO items (
+        year, make, model, vin, miles, location_address,
+        raw_text, extra_attributes,
+        data_capture_status, review_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        extracted.year,
+        extracted.make,
+        extracted.model,
+        extracted.vin,
+        extracted.miles,
+        extracted.location_address,
+        raw_text,
+        JSON.stringify(extracted.extra_attributes),
+        'todo',
+        'todo',
+      ]
+    );
+
+    const item = result.rows[0];
+
+    let estimate = null;
+    try {
+      const estimateResult = await estimateValue({
+        year: item.year,
+        make: item.make,
+        model: item.model,
+        mileage: item.miles,
+        location: item.location_address,
+        extra_attributes: extracted.extra_attributes,
+      });
+      estimate = await insertEstimate(item.id, estimateResult, item);
+    } catch (estErr) {
+      logger.error({ err: estErr, itemId: item.id }, 'Estimate failed for item');
+    }
+
+    res.status(201).json({ item, extracted, estimate });
+  } catch (error) {
+    logger.error({ err: error }, 'from-text failed');
+    res.status(500).json({ error: 'Failed to create item from text' });
+  }
+});
+
+// Update an existing item by re-extracting from edited text (no estimate)
+router.put('/:id/from-text', async (req, res) => {
+  try {
+    const { raw_text } = req.body;
+
+    if (!raw_text || typeof raw_text !== 'string' || raw_text.trim().length === 0) {
+      return res.status(400).json({ error: 'raw_text is required' });
+    }
+
+    let extracted;
+    try {
+      extracted = await extractFromText(raw_text);
+    } catch (extractErr) {
+      logger.error({ err: extractErr }, 'Extraction failed');
+      return res.status(500).json({ error: 'Failed to extract data from text' });
+    }
+
+    const result = await query(
+      `UPDATE items SET
+        year = $1,
+        make = $2,
+        model = $3,
+        vin = $4,
+        miles = $5,
+        location_address = $6,
+        raw_text = $7,
+        extra_attributes = $8,
+        updated_at = NOW()
+      WHERE id = $9
+      RETURNING *`,
+      [
+        extracted.year,
+        extracted.make,
+        extracted.model,
+        extracted.vin,
+        extracted.miles,
+        extracted.location_address,
+        raw_text,
+        JSON.stringify(extracted.extra_attributes),
+        req.params.id,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const item = result.rows[0];
+    res.json({ item, extracted });
+  } catch (error) {
+    logger.error({ err: error }, 'update from-text failed');
+    res.status(500).json({ error: 'Failed to update item from text' });
+  }
+});
 
 export default router;

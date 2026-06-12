@@ -1,0 +1,16 @@
+# ClusterIP: the gateway (APISIX) routes to this Service; it is not
+# exposed directly. Port 80 in-cluster maps to the container's 3001.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pw-ims-service
+  labels:
+    app: pw-ims-service
+spec:
+  type: ClusterIP
+  selector:
+    app: pw-ims-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3001
