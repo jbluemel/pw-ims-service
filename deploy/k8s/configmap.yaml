@@ -10,7 +10,7 @@ data:
   LOG_LEVEL: "info"
   SHUTDOWN_TIMEOUT_MS: "10000"
   # DB connection parts — connection.ts assembles these when DATABASE_URL is unset.
-  DB_HOST: "pw-ims-db.example.us-east-2.rds.amazonaws.com"
+  DB_HOST: "pw-ims-db.c5ck64u8yq3p.us-east-2.rds.amazonaws.com"
   DB_NAME: "ims_db"
   DB_PORT: "5432"
   DB_USER: "postgres"

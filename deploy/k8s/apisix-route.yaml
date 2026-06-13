@@ -1,0 +1,16 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: pw-ims-route
+spec:
+  ingressClassName: apisix
+  http:
+    - name: pw-ims-all
+      match:
+        hosts:
+          - "*"
+        paths:
+          - "/*"
+      backends:
+        - serviceName: pw-ims-service
+          servicePort: 80

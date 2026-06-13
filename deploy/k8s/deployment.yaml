@@ -23,7 +23,7 @@ spec:
       containers:
         - name: pw-ims-service
           # Replace with the ECR image ref; CI injects the tag.
-          image: <ECR_REGISTRY>/pw-ims-service:<TAG>
+          image: 900889879753.dkr.ecr.us-east-2.amazonaws.com/pw-ims-service:latest
           ports:
             - containerPort: 3001
           envFrom:
