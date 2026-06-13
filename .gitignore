@@ -3,3 +3,4 @@ dist/
 .env
 docker-compose.override.yml
 deploy/k8s/apisix-route.yaml
+deploy/k8s/frontend-route.yaml

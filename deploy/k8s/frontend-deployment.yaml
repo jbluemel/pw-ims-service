@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pw-ims-frontend
+  labels:
+    app: pw-ims-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pw-ims-frontend
+  template:
+    metadata:
+      labels:
+        app: pw-ims-frontend
+    spec:
+      containers:
+        - name: pw-ims-frontend
+          image: 900889879753.dkr.ecr.us-east-2.amazonaws.com/pw-ims-frontend:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pw-ims-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: pw-ims-frontend
+  ports:
+    - port: 80
+      targetPort: 80

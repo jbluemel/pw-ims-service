@@ -1,0 +1,34 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: pw-ims-frontend-route
+spec:
+  ingressClassName: apisix
+  http:
+    - name: pw-ims-frontend
+      match:
+        hosts:
+          - "*"
+        paths:
+          - "/*"
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-Forwarded-Proto: "https"
+        - name: openid-connect
+          enable: true
+          config:
+            client_id: pw-ims-app
+            client_secret: SET_VIA_KUBECTL_NOT_COMMITTED
+            discovery: https://d2pfxib5jn3b7k.cloudfront.net/auth/realms/pw-ims/.well-known/openid-configuration
+            redirect_uri: https://d2pfxib5jn3b7k.cloudfront.net/callback
+            scope: openid profile email
+            bearer_only: false
+            session:
+              secret: a7f3e9c2b85d416f9e08d3a1c6b72f04
+      backends:
+        - serviceName: pw-ims-frontend
+          servicePort: 80
