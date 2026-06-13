@@ -1,0 +1,28 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: pw-ims-route
+spec:
+  ingressClassName: apisix
+  http:
+    - name: pw-ims-all
+      match:
+        hosts:
+          - "*"
+        paths:
+          - "/*"
+      plugins:
+        - name: openid-connect
+          enable: true
+          config:
+            client_id: pw-ims-app
+            client_secret: SET_VIA_KUBECTL_NOT_COMMITTED
+            discovery: http://ab79698bf04664da2831c2ef8fc695c4-1137544767.us-east-2.elb.amazonaws.com/auth/realms/pw-ims/.well-known/openid-configuration
+            redirect_uri: http://ab79698bf04664da2831c2ef8fc695c4-1137544767.us-east-2.elb.amazonaws.com/callback
+            scope: openid profile email
+            bearer_only: false
+            session:
+              secret: a7f3e9c2b85d416f9e08d3a1c6b72f04
+      backends:
+        - serviceName: pw-ims-service
+          servicePort: 80

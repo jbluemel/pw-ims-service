@@ -1,16 +1,17 @@
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
-  name: pw-ims-route
+  name: keycloak-route
+  namespace: keycloak
 spec:
   ingressClassName: apisix
   http:
-    - name: pw-ims-all
+    - name: keycloak-all
       match:
         hosts:
           - "*"
         paths:
-          - "/*"
+          - "/auth/*"
       backends:
-        - serviceName: pw-ims-service
+        - serviceName: keycloak-keycloakx-http
           servicePort: 80
