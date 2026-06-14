@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import { query } from '../../db/connection';
-import { estimateValue } from '../ai/estimator';
-import { insertEstimate, listEstimatesForItem, getLatestEstimate } from './estimates';
 import { extractFromText } from '../ai/extractor';
 import { generateUniqueIcn } from './icn';
 import { requestAppraisal } from './pwasClient';
@@ -32,7 +30,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create item (auto-estimates value on save)
+// Create item (requests appraisal from PWAS if flagged)
 router.post('/', async (req, res) => {
   try {
     const {
@@ -59,21 +57,6 @@ router.post('/', async (req, res) => {
 
     const item = result.rows[0];
 
-    // Try to estimate value — best-effort, don't fail item creation if it errors
-    let estimate = null;
-    try {
-      const estimateResult = await estimateValue({
-        year: item.year,
-        make: item.make,
-        model: item.model,
-        mileage: item.miles,
-        location: item.location_address,
-      });
-      estimate = await insertEstimate(item.id, estimateResult, item);
-    } catch (estErr) {
-      logger.error({ err: estErr, itemId: item.id }, 'Estimate failed for item');
-    }
-
     // If flagged, request an appraisal from PWAS — best-effort, don't fail creation.
     if (appraisal_requested) {
       try {
@@ -83,7 +66,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    res.status(201).json({ ...item, estimate });
+    res.status(201).json(item);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create item' });
   }
@@ -196,59 +179,11 @@ router.delete('/:id', async (req, res) => {
 });
 
 
-// Manual re-estimate
-router.post('/:id/estimates', async (req, res) => {
-  try {
-    const itemResult = await query('SELECT * FROM items WHERE id = $1', [req.params.id]);
-    if (itemResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    const item = itemResult.rows[0];
-
-    const estimateResult = await estimateValue({
-      year: item.year,
-      make: item.make,
-      model: item.model,
-      mileage: item.miles,
-      location: item.location_address,
-    });
-    const estimate = await insertEstimate(item.id, estimateResult, item);
-
-    res.status(201).json(estimate);
-  } catch (error) {
-    logger.error({ err: error }, 'Re-estimate failed');
-    res.status(500).json({ error: 'Failed to create estimate' });
-  }
-});
-
-// List all estimates for an item (history)
-router.get('/:id/estimates', async (req, res) => {
-  try {
-    const estimates = await listEstimatesForItem(req.params.id);
-    res.json(estimates);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch estimates' });
-  }
-});
-
-// Get latest estimate for an item
-router.get('/:id/estimates/latest', async (req, res) => {
-  try {
-    const estimate = await getLatestEstimate(req.params.id);
-    if (!estimate) {
-      return res.status(404).json({ error: 'No estimate found' });
-    }
-    res.json(estimate);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch estimate' });
-  }
-});
 
 
 
 
-
-// Create item from unstructured text — extract, save, estimate
+// Create item from unstructured text — extract and save
 router.post('/from-text', async (req, res) => {
   try {
     const { raw_text } = req.body;
@@ -289,22 +224,7 @@ router.post('/from-text', async (req, res) => {
 
     const item = result.rows[0];
 
-    let estimate = null;
-    try {
-      const estimateResult = await estimateValue({
-        year: item.year,
-        make: item.make,
-        model: item.model,
-        mileage: item.miles,
-        location: item.location_address,
-        extra_attributes: extracted.extra_attributes,
-      });
-      estimate = await insertEstimate(item.id, estimateResult, item);
-    } catch (estErr) {
-      logger.error({ err: estErr, itemId: item.id }, 'Estimate failed for item');
-    }
-
-    res.status(201).json({ item, extracted, estimate });
+    res.status(201).json({ item, extracted });
   } catch (error) {
     logger.error({ err: error }, 'from-text failed');
     res.status(500).json({ error: 'Failed to create item from text' });
