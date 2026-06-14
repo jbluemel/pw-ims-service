@@ -4,6 +4,7 @@ import { up as up003 } from './003_create_estimates_table';
 import { up as up004 } from './004_add_raw_text_and_source';
 import { up as up005 } from './005_add_estimate_snapshot';
 import { up as up006 } from './006_add_icn';
+import { up as up007 } from './007_drop_universal_id';
 
 // Ordered list of migrations. The runner applies any whose `id` is not yet
 // recorded in the schema_migrations table. Append new migrations to the end —
@@ -20,4 +21,5 @@ export const migrations: Migration[] = [
   { id: '004_add_raw_text_and_source', up: up004 },
   { id: '005_add_estimate_snapshot', up: up005 },
   { id: '006_add_icn', up: up006 },
+  { id: '007_drop_universal_id', up: up007 },
 ];
