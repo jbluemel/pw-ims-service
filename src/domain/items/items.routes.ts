@@ -186,7 +186,7 @@ router.delete('/:id', async (req, res) => {
 // Create item from unstructured text — extract and save
 router.post('/from-text', async (req, res) => {
   try {
-    const { raw_text } = req.body;
+    const { raw_text, appraisal_requested } = req.body;
 
     if (!raw_text || typeof raw_text !== 'string' || raw_text.trim().length === 0) {
       return res.status(400).json({ error: 'raw_text is required' });
