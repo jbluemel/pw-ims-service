@@ -3,6 +3,7 @@ import { query } from '../../db/connection';
 import { estimateValue } from '../ai/estimator';
 import { insertEstimate, listEstimatesForItem, getLatestEstimate } from './estimates';
 import { extractFromText } from '../ai/extractor';
+import { generateUniqueIcn } from './icn';
 import { logger } from '../../lib/logger';
 
 const router = Router();
@@ -41,12 +42,13 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO items (
-        year, make, model, vin, miles, location_address, seller_account_number,
+        icn, year, make, model, vin, miles, location_address, seller_account_number,
         data_capture_status, title_received, seller_name_matches, lien_search,
         clean_title_check, odometer_reading_check, review_status, published
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *`,
       [
+        await generateUniqueIcn(),
         year, make, model, vin, miles, location_address, seller_account_number,
         data_capture_status, title_received, seller_name_matches, lien_search,
         clean_title_check, odometer_reading_check, review_status, published
@@ -254,12 +256,13 @@ router.post('/from-text', async (req, res) => {
 
     const result = await query(
       `INSERT INTO items (
-        year, make, model, vin, miles, location_address,
+        icn, year, make, model, vin, miles, location_address,
         raw_text, extra_attributes,
         data_capture_status, review_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
+        await generateUniqueIcn(),
         extracted.year,
         extracted.make,
         extracted.model,
