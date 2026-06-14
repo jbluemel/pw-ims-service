@@ -14,3 +14,5 @@ data:
   DB_NAME: "ims_db"
   DB_PORT: "5432"
   DB_USER: "postgres"
+  # In-cluster address of PWAS for appraisal requests.
+  PWAS_URL: "http://pw-pwas-service"
