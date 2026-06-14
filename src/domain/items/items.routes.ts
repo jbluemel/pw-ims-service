@@ -107,31 +107,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Partial update item
-router.patch('/:id', async (req, res) => {
-  try {
-    const fields = Object.keys(req.body);
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
-    const values = fields.map(field => req.body[field]);
-    
-    const result = await query(
-      `UPDATE items SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${fields.length + 1} RETURNING *`,
-      [...values, req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update item' });
-  }
-});
-
 // Publish item
 router.post('/:id/publish', async (req, res) => {
   try {
@@ -290,6 +265,49 @@ router.put('/:id/from-text', async (req, res) => {
   } catch (error) {
     logger.error({ err: error }, 'update from-text failed');
     res.status(500).json({ error: 'Failed to update item from text' });
+  }
+});
+
+// Partial update — only the provided fields change. Top-level columns are set
+// individually; extra_attributes is DEEP-MERGED (existing || provided) so other
+// attributes are preserved. Used by the PWAS write-back (data corrections).
+router.patch('/:id', async (req, res) => {
+  try {
+    const allowed = [
+      'year', 'make', 'model', 'vin', 'miles', 'location_address',
+      'seller_account_number', 'data_capture_status', 'title_received',
+      'seller_name_matches', 'lien_search', 'clean_title_check',
+      'odometer_reading_check', 'review_status', 'published',
+    ];
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+    for (const key of allowed) {
+      if (key in req.body) {
+        sets.push(`${key} = $${i++}`);
+        values.push(req.body[key]);
+      }
+    }
+    if ('extra_attributes' in req.body && req.body.extra_attributes) {
+      sets.push(`extra_attributes = COALESCE(extra_attributes, '{}'::jsonb) || $${i++}::jsonb`);
+      values.push(JSON.stringify(req.body.extra_attributes));
+    }
+    if (sets.length === 0) {
+      return res.status(400).json({ error: 'No updatable fields provided' });
+    }
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(req.params.id);
+    const result = await query(
+      `UPDATE items SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    logger.error({ err: error }, 'Patch failed');
+    res.status(500).json({ error: 'Failed to patch item' });
   }
 });
 
