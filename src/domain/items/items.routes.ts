@@ -4,6 +4,7 @@ import { estimateValue } from '../ai/estimator';
 import { insertEstimate, listEstimatesForItem, getLatestEstimate } from './estimates';
 import { extractFromText } from '../ai/extractor';
 import { generateUniqueIcn } from './icn';
+import { requestAppraisal } from './pwasClient';
 import { logger } from '../../lib/logger';
 
 const router = Router();
@@ -37,7 +38,8 @@ router.post('/', async (req, res) => {
     const {
       year, make, model, vin, miles, location_address, seller_account_number,
       data_capture_status, title_received, seller_name_matches, lien_search,
-      clean_title_check, odometer_reading_check, review_status, published
+      clean_title_check, odometer_reading_check, review_status, published,
+      appraisal_requested
     } = req.body;
 
     const result = await query(
@@ -70,6 +72,15 @@ router.post('/', async (req, res) => {
       estimate = await insertEstimate(item.id, estimateResult, item);
     } catch (estErr) {
       logger.error({ err: estErr, itemId: item.id }, 'Estimate failed for item');
+    }
+
+    // If flagged, request an appraisal from PWAS — best-effort, don't fail creation.
+    if (appraisal_requested) {
+      try {
+        await requestAppraisal(item);
+      } catch (pwasErr) {
+        logger.error({ err: pwasErr, itemId: item.id }, 'PWAS appraisal request failed');
+      }
     }
 
     res.status(201).json({ ...item, estimate });
