@@ -221,8 +221,15 @@ router.post('/from-text', async (req, res) => {
         'todo',
       ]
     );
-
     const item = result.rows[0];
+
+    if (appraisal_requested) {
+      try {
+        await requestAppraisal(item);
+      } catch (pwasErr) {
+        logger.error({ err: pwasErr, itemId: item.id }, "PWAS appraisal request failed");
+      }
+    }
 
     res.status(201).json({ item, extracted });
   } catch (error) {
